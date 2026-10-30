@@ -27,7 +27,9 @@ services:
             APP_ENV: local
             APP_URL: http://localhost:${API_HOST_PORT:-8000}
             FRONTEND_URL: http://localhost:${WEB_HOST_PORT:-3000}
-            PHP_CLI_SERVER_WORKERS: 4
+            # Each worker serves one connection at a time, and browsers keep spare
+            # connections open, so a handful of workers runs out quickly.
+            PHP_CLI_SERVER_WORKERS: 16
             DB_CONNECTION: mysql
             DB_HOST: mysql
             DB_PORT: 3306

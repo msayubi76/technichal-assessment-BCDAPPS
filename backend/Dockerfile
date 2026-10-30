@@ -8,6 +8,12 @@ RUN apt-get update \
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+# The built-in server runs as CLI, where OPcache is off by default, so every
+# request would compile the whole framework again. Timestamps are still
+# checked, so code changes show up straight away.
+RUN printf "opcache.enable_cli=1\nopcache.validate_timestamps=1\nopcache.revalidate_freq=0\n" \
+    > /usr/local/etc/php/conf.d/opcache-cli.ini
+
 WORKDIR /var/www/html
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint
