@@ -45,6 +45,16 @@ export const api = {
   acceptRide: (id: string) =>
     apiRequest<Ride>(`/rides/${id}/accept`, { method: "POST", idempotencyKey: newIdempotencyKey(), retries: 2 }),
 
+  /** Rider: "I'm coming", once the driver is waiting at the pickup. */
+  riderComing: (id: string) =>
+    apiRequest<Ride>(`/rides/${id}/coming`, { method: "POST", idempotencyKey: newIdempotencyKey(), retries: 2 }),
+
+  arriveAtPickup: (id: string) =>
+    apiRequest<Ride>(`/rides/${id}/arrive`, { method: "POST", idempotencyKey: newIdempotencyKey(), retries: 2 }),
+
+  startTrip: (id: string) =>
+    apiRequest<Ride>(`/rides/${id}/start`, { method: "POST", idempotencyKey: newIdempotencyKey(), retries: 2 }),
+
   completeRide: (id: string) =>
     apiRequest<Ride>(`/rides/${id}/complete`, { method: "POST", idempotencyKey: newIdempotencyKey(), retries: 2 }),
 

@@ -44,10 +44,15 @@ class RideResource extends JsonResource
             'rider' => $this->whenLoaded('rider', fn () => ['name' => $this->rider->name]),
             'cancelled_by' => $this->cancelled_by?->value,
             'cancellation_reason' => $this->cancellation_reason,
-            'can_cancel' => $this->status->isActive()
-                && ($viewer?->id === $this->rider_id || ($viewerIsAssignedDriver && $this->status === RideStatus::Accepted)),
+            // The rider can cancel until the trip starts. The driver can too,
+            // once they have accepted it (for example when the rider doesn't show up).
+            'can_cancel' => in_array($this->status, [RideStatus::Requested, RideStatus::Accepted, RideStatus::Arrived], true)
+                && ($viewer?->id === $this->rider_id || ($viewerIsAssignedDriver && $this->status !== RideStatus::Requested)),
             'requested_at' => $this->requested_at?->toIso8601String(),
             'accepted_at' => $this->accepted_at?->toIso8601String(),
+            'arrived_at' => $this->arrived_at?->toIso8601String(),
+            'rider_coming_at' => $this->rider_coming_at?->toIso8601String(),
+            'started_at' => $this->started_at?->toIso8601String(),
             'completed_at' => $this->completed_at?->toIso8601String(),
             'cancelled_at' => $this->cancelled_at?->toIso8601String(),
         ];

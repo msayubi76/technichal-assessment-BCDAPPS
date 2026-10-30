@@ -8,7 +8,7 @@ import { listenToRide } from "@/lib/realtime";
 import { pollInterval, useRealtimeConnected } from "./useRealtimeConnected";
 
 export function isActive(ride: Ride | null | undefined): boolean {
-  return ride?.status === "requested" || ride?.status === "accepted";
+  return ride?.status !== undefined && ride.status !== "completed" && ride.status !== "cancelled";
 }
 
 /**

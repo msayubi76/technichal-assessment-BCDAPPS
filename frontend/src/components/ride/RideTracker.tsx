@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { MapPlaceholder } from "@/components/booking/MapPlaceholder";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -7,6 +8,7 @@ import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { Spinner } from "@/components/ui/Spinner";
 import { useRide } from "@/hooks/useRide";
+import { api } from "@/lib/api/endpoints";
 import type { Ride } from "@/lib/api/types";
 import { formatDuration, formatMoney } from "@/lib/format";
 import { CancelRideButton } from "./CancelRideButton";
@@ -42,6 +44,8 @@ export function RideTracker({ rideId, initialRide, onBookAnother }: RideTrackerP
 
         {ride.driver && ride.status !== "requested" && <DriverCard driver={ride.driver} />}
 
+        {ride.status === "arrived" && <ComingButton ride={ride} onDone={(updated) => void mutate(updated, { revalidate: false })} />}
+
         <div className="space-y-1 text-sm">
           <p className="text-slate-500">From</p>
           <p className="font-medium text-slate-900">{ride.pickup.name}</p>
@@ -66,7 +70,46 @@ export function RideTracker({ rideId, initialRide, onBookAnother }: RideTrackerP
         )}
       </Card>
 
-      <MapPlaceholder pickup={ride.pickup} dropoff={ride.dropoff} driver={ride.status === "accepted" ? ride.driver?.location : null} />
+      <MapPlaceholder
+        pickup={ride.pickup}
+        dropoff={ride.dropoff}
+        driver={ride.status === "accepted" || ride.status === "arrived" ? ride.driver?.location : null}
+      />
+    </div>
+  );
+}
+
+/** Lets the waiting driver know the rider is on their way out. */
+function ComingButton({ ride, onDone }: { ride: Ride; onDone: (ride: Ride) => void }) {
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+
+  if (ride.rider_coming_at) {
+    return (
+      <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm font-medium text-emerald-900">
+        Your driver knows you are coming.
+      </p>
+    );
+  }
+
+  async function send() {
+    setSending(true);
+    setError(null);
+    try {
+      onDone(await api.riderComing(ride.id));
+    } catch (e) {
+      setError(e);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      {error !== null && <ErrorAlert title="Could not tell your driver" error={error} />}
+      <Button className="w-full" loading={sending} onClick={send}>
+        I&apos;m coming
+      </Button>
     </div>
   );
 }
@@ -93,6 +136,20 @@ function Headline({ ride }: { ride: Ride }) {
           {ride.pickup_eta_seconds !== null && (
             <p className="text-sm text-slate-500">Arriving in about {formatDuration(ride.pickup_eta_seconds)}</p>
           )}
+        </div>
+      );
+    case "arrived":
+      return (
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900">Your driver has arrived</h1>
+          <p className="text-sm text-slate-500">They are waiting for you at {ride.pickup.name}.</p>
+        </div>
+      );
+    case "in_progress":
+      return (
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900">On the way to your destination</h1>
+          <p className="text-sm text-slate-500">About {formatDuration(ride.duration_seconds)} to {ride.dropoff.name}.</p>
         </div>
       );
     case "completed":

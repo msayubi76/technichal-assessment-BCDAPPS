@@ -21,7 +21,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Everything that happens to a ride: quote, request, accept, cancel, complete.
+ * Everything that happens to a ride: quote, request, accept, arrive, start,
+ * cancel, complete.
  *
  * Every change runs inside a database transaction. When a change touches both
  * a ride and a driver, the ride row is locked first and the driver row second,
@@ -191,9 +192,52 @@ class RideService
     }
 
     /**
-     * The rider can cancel while waiting or after a driver accepted.
-     * The assigned driver can cancel an accepted ride. Either way the
-     * driver becomes free for new rides again.
+     * The assigned driver has reached the pickup point.
+     */
+    public function arrive(string $rideId, Driver $driver): Ride
+    {
+        return $this->moveAsDriver($rideId, $driver, RideStatus::Arrived, 'arrived_at', 'ride.driver_arrived');
+    }
+
+    /**
+     * The rider is in the car and the driver sets off to the destination.
+     * This doesn't wait for the rider's "I'm coming": that is only a message.
+     */
+    public function start(string $rideId, Driver $driver): Ride
+    {
+        return $this->moveAsDriver($rideId, $driver, RideStatus::InProgress, 'started_at', 'ride.started');
+    }
+
+    /**
+     * The rider tells the waiting driver they are on their way out. It doesn't
+     * change the ride's status, so tapping it twice does no harm.
+     */
+    public function riderComing(string $rideId, User $rider): Ride
+    {
+        $ride = DB::transaction(function () use ($rideId, $rider) {
+            $ride = Ride::whereKey($rideId)->where('rider_id', $rider->id)->lockForUpdate()->firstOrFail();
+
+            if ($ride->status !== RideStatus::Arrived) {
+                throw new ApiException('driver_not_arrived', 'You can let the driver know once they have arrived.', 409);
+            }
+
+            if ($ride->rider_coming_at === null) {
+                $ride->update(['rider_coming_at' => now()]);
+                $this->recordEvent($ride, $ride->status, ActorType::Rider, $rider->id, ['action' => 'rider_coming']);
+            }
+
+            return $ride;
+        });
+
+        $this->notifier->statusChanged($ride);
+
+        return $ride;
+    }
+
+    /**
+     * The rider can cancel until the trip starts. The assigned driver can
+     * cancel after accepting, for example when the rider doesn't show up.
+     * Either way the driver becomes free for new rides again.
      */
     public function cancel(string $rideId, User $actor, ?string $reason): Ride
     {
@@ -260,6 +304,30 @@ class RideService
         });
 
         Log::info('ride.completed', ['ride_id' => $ride->id, 'driver_id' => $driver->id]);
+        $this->notifier->statusChanged($ride);
+
+        return $ride;
+    }
+
+    /**
+     * A step only the assigned driver can take, and that doesn't change the
+     * driver's own status (they stay on the trip).
+     */
+    private function moveAsDriver(string $rideId, Driver $driver, RideStatus $to, string $timestampColumn, string $logEvent): Ride
+    {
+        $ride = DB::transaction(function () use ($rideId, $driver, $to, $timestampColumn) {
+            $ride = Ride::whereKey($rideId)->where('driver_id', $driver->id)->lockForUpdate()->firstOrFail();
+
+            $this->stateMachine->assertCanMove($ride, $to);
+
+            $from = $ride->status;
+            $ride->update(['status' => $to, $timestampColumn => now()]);
+            $this->recordEvent($ride, $from, ActorType::Driver, $driver->user_id);
+
+            return $ride;
+        });
+
+        Log::info($logEvent, ['ride_id' => $ride->id, 'driver_id' => $driver->id]);
         $this->notifier->statusChanged($ride);
 
         return $ride;

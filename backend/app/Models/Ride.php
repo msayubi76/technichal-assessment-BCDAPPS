@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'distance_meters', 'duration_seconds', 'pickup_eta_seconds',
     'currency', 'base_fare', 'distance_fare', 'time_fare', 'surge_multiplier',
     'total_fare', 'commission_amount', 'driver_earning',
-    'requested_at', 'accepted_at', 'completed_at', 'cancelled_at',
+    'requested_at', 'accepted_at', 'arrived_at', 'rider_coming_at', 'started_at', 'completed_at', 'cancelled_at',
     'cancelled_by', 'cancellation_reason',
 ])]
 class Ride extends Model
@@ -49,6 +49,9 @@ class Ride extends Model
             'driver_earning' => 'integer',
             'requested_at' => 'datetime',
             'accepted_at' => 'datetime',
+            'arrived_at' => 'datetime',
+            'rider_coming_at' => 'datetime',
+            'started_at' => 'datetime',
             'completed_at' => 'datetime',
             'cancelled_at' => 'datetime',
         ];

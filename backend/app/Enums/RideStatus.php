@@ -6,15 +6,18 @@ enum RideStatus: string
 {
     case Requested = 'requested';
     case Accepted = 'accepted';
+    case Arrived = 'arrived';
+    case InProgress = 'in_progress';
     case Completed = 'completed';
     case Cancelled = 'cancelled';
 
     /**
-     * A ride is active while it is waiting for a driver or on its way.
+     * A ride is active from the moment it is requested until it is completed
+     * or cancelled.
      */
     public function isActive(): bool
     {
-        return in_array($this, [self::Requested, self::Accepted], true);
+        return in_array($this->value, self::activeValues(), true);
     }
 
     /**
@@ -22,6 +25,6 @@ enum RideStatus: string
      */
     public static function activeValues(): array
     {
-        return [self::Requested->value, self::Accepted->value];
+        return [self::Requested->value, self::Accepted->value, self::Arrived->value, self::InProgress->value];
     }
 }

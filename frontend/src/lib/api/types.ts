@@ -1,7 +1,7 @@
 // Shapes returned by the backend API. Money is always in the smallest
 // currency unit (paisa for PKR); format it with formatMoney().
 
-export type RideStatus = "requested" | "accepted" | "completed" | "cancelled";
+export type RideStatus = "requested" | "accepted" | "arrived" | "in_progress" | "completed" | "cancelled";
 export type RideCategory = "economy" | "comfort";
 export type DriverStatus = "offline" | "available" | "on_trip";
 export type UserRole = "rider" | "driver";
@@ -75,6 +75,9 @@ export interface Ride {
   can_cancel: boolean;
   requested_at: string | null;
   accepted_at: string | null;
+  arrived_at: string | null;
+  rider_coming_at: string | null;
+  started_at: string | null;
   completed_at: string | null;
   cancelled_at: string | null;
 }

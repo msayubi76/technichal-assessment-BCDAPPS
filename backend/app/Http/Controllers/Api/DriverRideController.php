@@ -50,6 +50,20 @@ class DriverRideController extends Controller
         return ApiResponse::success(new RideResource($ride->load(['driver.user', 'rider'])));
     }
 
+    public function arrive(Request $request, string $ride): JsonResponse
+    {
+        $ride = $this->rides->arrive($ride, $this->driver($request));
+
+        return ApiResponse::success(new RideResource($ride->load(['driver.user', 'rider'])));
+    }
+
+    public function start(Request $request, string $ride): JsonResponse
+    {
+        $ride = $this->rides->start($ride, $this->driver($request));
+
+        return ApiResponse::success(new RideResource($ride->load(['driver.user', 'rider'])));
+    }
+
     public function complete(Request $request, string $ride): JsonResponse
     {
         $ride = $this->rides->complete($ride, $this->driver($request));

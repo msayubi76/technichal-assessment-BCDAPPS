@@ -3,6 +3,8 @@ import type { Ride } from "@/lib/api/types";
 const steps = [
   { key: "requested", label: "Requested" },
   { key: "accepted", label: "Driver on the way" },
+  { key: "arrived", label: "Driver at pickup" },
+  { key: "in_progress", label: "On the trip" },
   { key: "completed", label: "Arrived" },
 ] as const;
 

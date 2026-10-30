@@ -4,6 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
 // so it needs no web server of its own here.
 export default defineConfig({
   testDir: "./tests/e2e",
+  globalSetup: "./tests/e2e/global-setup.ts",
   // Generous, because the dev server compiles each page on its first visit
   // and Docker on a laptop can be slow while several browsers are open.
   timeout: 180_000,

@@ -8,7 +8,18 @@ if [ "$CONTAINER_ROLE" = "api" ]; then
         cp .env.example .env
     fi
 
-    composer install --no-interaction --prefer-dist
+    # Try a few times: on a slow connection some downloads time out, and the
+    # next attempt only fetches what is still missing (the rest is cached).
+    attempt=1
+    until composer install --no-interaction --prefer-dist --no-progress; do
+        if [ "$attempt" -ge 3 ]; then
+            echo "composer install failed after $attempt attempts" >&2
+            exit 1
+        fi
+        attempt=$((attempt + 1))
+        echo "composer install failed, retrying (attempt $attempt of 3)..."
+        sleep 5
+    done
 
     if ! grep -q '^APP_KEY=base64' .env; then
         php artisan key:generate --force

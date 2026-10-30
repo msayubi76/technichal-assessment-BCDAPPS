@@ -17,6 +17,13 @@ import { formatDistance, formatMoney } from "@/lib/format";
 import { listenForRideRequests, listenToRide } from "@/lib/realtime";
 import { OpenRideCard } from "./OpenRideCard";
 
+// The button the driver presses next, for each step of the trip.
+const stepLabels: Partial<Record<Ride["status"], string>> = {
+  accepted: "Arrived",
+  arrived: "On the way to destination",
+  in_progress: "Completed",
+};
+
 export function DriverDashboard() {
   const { user, ready, logout } = useSession("driver");
   const connected = useRealtimeConnected();
@@ -85,14 +92,22 @@ export function DriverDashboard() {
     }
   }
 
-  async function complete(ride: Ride) {
+  /** Moves the current trip to its next step: arrived, on the way, completed. */
+  async function nextStep(ride: Ride) {
     setBusyRideId(ride.id);
     setActionError(null);
     try {
-      setLastTrip(await api.completeRide(ride.id));
-      await current.mutate(null, { revalidate: false });
-      void me.mutate();
+      if (ride.status === "accepted") {
+        await current.mutate(await api.arriveAtPickup(ride.id), { revalidate: false });
+      } else if (ride.status === "arrived") {
+        await current.mutate(await api.startTrip(ride.id), { revalidate: false });
+      } else {
+        setLastTrip(await api.completeRide(ride.id));
+        await current.mutate(null, { revalidate: false });
+        void me.mutate();
+      }
     } catch (e) {
+      // Usually the rider cancelled meanwhile. Show why and reload the trip.
       setActionError(e);
       void current.mutate();
     } finally {
@@ -154,8 +169,13 @@ export function DriverDashboard() {
                 {formatDistance(currentRide.distance_meters)} · fare {formatMoney(currentRide.fare.total, currentRide.fare.currency)}
               </p>
             </div>
-            <Button className="w-full" loading={busyRideId === currentRide.id} onClick={() => complete(currentRide)}>
-              Complete trip
+            {currentRide.status === "arrived" && (
+              <p role="status" className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
+                {currentRide.rider_coming_at ? "The rider is coming." : "Waiting for the rider at the pickup."}
+              </p>
+            )}
+            <Button className="w-full" loading={busyRideId === currentRide.id} onClick={() => nextStep(currentRide)}>
+              {stepLabels[currentRide.status]}
             </Button>
             {currentRide.can_cancel && (
               <CancelRideButton ride={currentRide} onCancelled={afterCancel} onStale={() => void current.mutate()} />

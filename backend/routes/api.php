@@ -23,6 +23,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/rides', [RideController::class, 'store'])->middleware('idempotent');
         Route::get('/rides', [RideController::class, 'index']);
         Route::get('/rides/current', [RideController::class, 'current']);
+        Route::post('/rides/{ride}/coming', [RideController::class, 'coming'])->middleware('idempotent');
     });
 
     // Riders and drivers, each limited to their own rides
@@ -32,6 +33,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Driver actions
     Route::middleware('role:driver')->group(function () {
         Route::post('/rides/{ride}/accept', [DriverRideController::class, 'accept'])->middleware('idempotent');
+        Route::post('/rides/{ride}/arrive', [DriverRideController::class, 'arrive'])->middleware('idempotent');
+        Route::post('/rides/{ride}/start', [DriverRideController::class, 'start'])->middleware('idempotent');
         Route::post('/rides/{ride}/complete', [DriverRideController::class, 'complete'])->middleware('idempotent');
         Route::get('/driver/rides/available', [DriverRideController::class, 'available']);
         Route::get('/driver/rides/current', [DriverRideController::class, 'current']);

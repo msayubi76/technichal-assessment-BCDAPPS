@@ -21,6 +21,21 @@ function driverPost(User $user, string $url, array $body = [])
         ->postJson($url, $body);
 }
 
+/**
+ * Takes the ride through the driver's steps up to the given one:
+ * accept, arrive at the pickup, start the trip.
+ */
+function driverStepsUpTo(string $lastStep, Ride $ride, User $driver): void
+{
+    foreach (['accept', 'arrive', 'start'] as $step) {
+        driverPost($driver, "/api/rides/{$ride->id}/{$step}")->assertOk();
+
+        if ($step === $lastStep) {
+            return;
+        }
+    }
+}
+
 describe('accepting a ride', function () {
     it('assigns the driver and marks them as on a trip', function () {
         driverPost($this->driver->user, "/api/rides/{$this->ride->id}/accept")
@@ -96,9 +111,86 @@ describe('accepting a ride', function () {
     });
 });
 
+describe('pickup and trip', function () {
+    it('lets the driver mark arrival at the pickup', function () {
+        driverStepsUpTo('accept', $this->ride, $this->driver->user);
+
+        driverPost($this->driver->user, "/api/rides/{$this->ride->id}/arrive")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'arrived')
+            ->assertJsonPath('data.can_cancel', true);
+
+        expect($this->ride->fresh()->arrived_at)->not->toBeNull()
+            ->and($this->driver->fresh()->status)->toBe(DriverStatus::OnTrip);
+    });
+
+    it("lets the rider say they're coming once the driver has arrived", function () {
+        driverStepsUpTo('arrive', $this->ride, $this->driver->user);
+
+        driverPost($this->rider, "/api/rides/{$this->ride->id}/coming")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'arrived');
+
+        $firstTap = $this->ride->fresh()->rider_coming_at;
+        expect($firstTap)->not->toBeNull();
+
+        // Tapping again changes nothing.
+        $this->travel(1)->minute();
+        driverPost($this->rider, "/api/rides/{$this->ride->id}/coming")->assertOk();
+        expect($this->ride->fresh()->rider_coming_at->equalTo($firstTap))->toBeTrue();
+    });
+
+    it("refuses \"I'm coming\" before the driver arrives", function () {
+        driverStepsUpTo('accept', $this->ride, $this->driver->user);
+
+        driverPost($this->rider, "/api/rides/{$this->ride->id}/coming")
+            ->assertConflict()
+            ->assertJsonPath('error.code', 'driver_not_arrived');
+
+        expect($this->ride->fresh()->rider_coming_at)->toBeNull();
+    });
+
+    it("only lets the ride's own rider say they're coming", function () {
+        driverStepsUpTo('arrive', $this->ride, $this->driver->user);
+        $stranger = User::factory()->rider()->create();
+
+        driverPost($stranger, "/api/rides/{$this->ride->id}/coming")->assertNotFound();
+        driverPost($this->driver->user, "/api/rides/{$this->ride->id}/coming")->assertForbidden();
+    });
+
+    it("starts the trip without waiting for the rider's message", function () {
+        driverStepsUpTo('arrive', $this->ride, $this->driver->user);
+
+        driverPost($this->driver->user, "/api/rides/{$this->ride->id}/start")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'in_progress')
+            ->assertJsonPath('data.can_cancel', false);
+
+        expect($this->ride->fresh()->started_at)->not->toBeNull();
+    });
+
+    it('cannot start the trip before reaching the pickup', function () {
+        driverStepsUpTo('accept', $this->ride, $this->driver->user);
+
+        driverPost($this->driver->user, "/api/rides/{$this->ride->id}/start")
+            ->assertConflict()
+            ->assertJsonPath('error.code', 'invalid_transition')
+            ->assertJsonPath('error.message', 'The driver has not reached the pickup point yet.');
+    });
+
+    it('only lets the assigned driver take these steps', function () {
+        driverStepsUpTo('accept', $this->ride, $this->driver->user);
+        $otherDriver = driverAt('Liberty Market');
+
+        driverPost($otherDriver->user, "/api/rides/{$this->ride->id}/arrive")->assertNotFound();
+        driverPost($this->rider, "/api/rides/{$this->ride->id}/arrive")->assertForbidden();
+        expect($this->ride->fresh()->status)->toBe(RideStatus::Accepted);
+    });
+});
+
 describe('completing a ride', function () {
     it('finishes the trip and frees the driver at the drop-off point', function () {
-        driverPost($this->driver->user, "/api/rides/{$this->ride->id}/accept")->assertOk();
+        driverStepsUpTo('start', $this->ride, $this->driver->user);
 
         driverPost($this->driver->user, "/api/rides/{$this->ride->id}/complete")
             ->assertOk()
@@ -117,8 +209,16 @@ describe('completing a ride', function () {
         expect($this->ride->fresh()->status)->toBe(RideStatus::Requested);
     });
 
+    it('cannot complete a trip that has not started', function () {
+        driverStepsUpTo('arrive', $this->ride, $this->driver->user);
+
+        driverPost($this->driver->user, "/api/rides/{$this->ride->id}/complete")
+            ->assertConflict()
+            ->assertJsonPath('error.message', 'The trip has not started yet.');
+    });
+
     it('cannot complete a ride twice', function () {
-        driverPost($this->driver->user, "/api/rides/{$this->ride->id}/accept")->assertOk();
+        driverStepsUpTo('start', $this->ride, $this->driver->user);
         driverPost($this->driver->user, "/api/rides/{$this->ride->id}/complete")->assertOk();
 
         driverPost($this->driver->user, "/api/rides/{$this->ride->id}/complete")
@@ -160,8 +260,30 @@ describe('cancelling a ride', function () {
             ->assertJsonPath('data.cancelled_by', 'driver');
     });
 
+    it('lets the rider or the driver cancel while the driver waits at the pickup', function (string $who) {
+        driverStepsUpTo('arrive', $this->ride, $this->driver->user);
+        $actor = $who === 'rider' ? $this->rider : $this->driver->user;
+
+        driverPost($actor, "/api/rides/{$this->ride->id}/cancel")
+            ->assertOk()
+            ->assertJsonPath('data.cancelled_by', $who);
+
+        expect($this->driver->fresh()->status)->toBe(DriverStatus::Available);
+    })->with(['rider', 'driver']);
+
+    it('cannot cancel once the trip has started', function (string $who) {
+        driverStepsUpTo('start', $this->ride, $this->driver->user);
+        $actor = $who === 'rider' ? $this->rider : $this->driver->user;
+
+        driverPost($actor, "/api/rides/{$this->ride->id}/cancel")
+            ->assertConflict()
+            ->assertJsonPath('error.message', 'The trip has already started, so it can no longer be cancelled.');
+
+        expect($this->ride->fresh()->status)->toBe(RideStatus::InProgress);
+    })->with(['rider', 'driver']);
+
     it('cannot cancel a completed ride', function () {
-        driverPost($this->driver->user, "/api/rides/{$this->ride->id}/accept")->assertOk();
+        driverStepsUpTo('start', $this->ride, $this->driver->user);
         driverPost($this->driver->user, "/api/rides/{$this->ride->id}/complete")->assertOk();
 
         driverPost($this->rider, "/api/rides/{$this->ride->id}/cancel")
@@ -234,12 +356,16 @@ describe('viewing rides', function () {
     });
 
     it('keeps a record of every status change', function () {
-        driverPost($this->driver->user, "/api/rides/{$this->ride->id}/accept")->assertOk();
+        driverStepsUpTo('arrive', $this->ride, $this->driver->user);
+        driverPost($this->rider, "/api/rides/{$this->ride->id}/coming")->assertOk();
+        driverPost($this->driver->user, "/api/rides/{$this->ride->id}/start")->assertOk();
         driverPost($this->driver->user, "/api/rides/{$this->ride->id}/complete")->assertOk();
 
-        $trail = Ride::find($this->ride->id)->events->map(fn ($event) => $event->to_status->value)->all();
+        $trail = Ride::find($this->ride->id)->events
+            ->map(fn ($event) => $event->meta['action'] ?? $event->to_status->value)
+            ->all();
 
-        expect($trail)->toBe(['requested', 'accepted', 'completed']);
+        expect($trail)->toBe(['requested', 'accepted', 'arrived', 'rider_coming', 'in_progress', 'completed']);
     });
 });
 

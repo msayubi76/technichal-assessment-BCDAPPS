@@ -56,7 +56,7 @@ describe("BookingForm", () => {
 
     expect(screen.getByText("Choose a destination different from the pickup.")).toBeInTheDocument();
     expect(mockedApi.estimate).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Request ride" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Book a ride" })).toBeDisabled();
   });
 
   it("does not allow a request when no drivers are nearby", async () => {
@@ -66,7 +66,7 @@ describe("BookingForm", () => {
     await choosePlaces();
 
     expect(await screen.findAllByText("No drivers nearby right now")).toHaveLength(2);
-    expect(screen.getByRole("button", { name: "Request ride" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Book a ride" })).toBeDisabled();
   });
 
   it("requests the ride and hands it back", async () => {
@@ -78,7 +78,7 @@ describe("BookingForm", () => {
 
     await choosePlaces();
     await screen.findByText("Rs 390");
-    await userEvent.click(screen.getByRole("button", { name: "Request ride" }));
+    await userEvent.click(screen.getByRole("button", { name: "Book a ride" }));
 
     expect(mockedApi.requestRide).toHaveBeenCalledWith("economy", expect.objectContaining({ name: "Liberty Market" }), expect.objectContaining({ name: "Packages Mall" }));
     expect(onBooked).toHaveBeenCalledWith(ride);
@@ -92,7 +92,7 @@ describe("BookingForm", () => {
 
     await choosePlaces();
     await screen.findByText("Rs 390");
-    await userEvent.click(screen.getByRole("button", { name: "Request ride" }));
+    await userEvent.click(screen.getByRole("button", { name: "Book a ride" }));
 
     expect(onActiveRideFound).toHaveBeenCalled();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();

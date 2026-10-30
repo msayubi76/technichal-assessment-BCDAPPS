@@ -64,6 +64,16 @@ class RideController extends Controller
         return ApiResponse::success(new RideResource($ride));
     }
 
+    /**
+     * "I'm coming": the rider tells the driver waiting at the pickup.
+     */
+    public function coming(Request $request, string $ride): JsonResponse
+    {
+        $ride = $this->rides->riderComing($ride, $request->user());
+
+        return ApiResponse::success(new RideResource($ride->load('driver.user')));
+    }
+
     public function cancel(CancelRideRequest $request, string $ride): JsonResponse
     {
         $ride = $this->rides->cancel($ride, $request->user(), $request->validated('reason'));

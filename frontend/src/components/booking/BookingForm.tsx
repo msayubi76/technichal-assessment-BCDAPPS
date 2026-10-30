@@ -121,7 +121,7 @@ export function BookingForm({ onBooked, onActiveRideFound }: BookingFormProps) {
         {submitError !== null && <ErrorAlert title="Could not request your ride" error={submitError} />}
 
         <Button className="w-full" disabled={!canRequest} loading={submitting} onClick={handleRequest}>
-          {submitting ? "Requesting…" : "Request ride"}
+          {submitting ? "Booking…" : "Book a ride"}
         </Button>
       </Card>
 

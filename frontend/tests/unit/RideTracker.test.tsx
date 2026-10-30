@@ -7,7 +7,7 @@ import { api } from "@/lib/api/endpoints";
 import { makeRide, renderWithSWR } from "./helpers";
 
 vi.mock("@/lib/api/endpoints", () => ({
-  api: { ride: vi.fn(), cancelRide: vi.fn() },
+  api: { ride: vi.fn(), cancelRide: vi.fn(), riderComing: vi.fn() },
 }));
 
 // No WebSocket in tests: the screen should still work through polling.
@@ -66,6 +66,30 @@ describe("RideTracker", () => {
     expect(rideApi.cancelRide).toHaveBeenCalledWith(makeRide().id);
     expect(screen.queryByRole("button", { name: "Cancel ride" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Book another ride" })).toBeInTheDocument();
+  });
+
+  it("lets the rider tell a waiting driver they're coming", async () => {
+    const arrived = makeRide({ status: "arrived", arrived_at: "2026-10-30T10:05:00Z" });
+    rideApi.ride.mockResolvedValue(arrived);
+    rideApi.riderComing.mockResolvedValue({ ...arrived, rider_coming_at: "2026-10-30T10:06:00Z" });
+
+    renderWithSWR(<RideTracker rideId="r1" onBookAnother={() => {}} />);
+
+    expect(await screen.findByRole("heading", { name: "Your driver has arrived" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "I'm coming" }));
+
+    expect(await screen.findByText("Your driver knows you are coming.")).toBeInTheDocument();
+    expect(rideApi.riderComing).toHaveBeenCalledWith(arrived.id);
+    expect(screen.queryByRole("button", { name: "I'm coming" })).not.toBeInTheDocument();
+  });
+
+  it("does not offer \"I'm coming\" before the driver arrives", async () => {
+    rideApi.ride.mockResolvedValue(makeRide({ status: "accepted" }));
+
+    renderWithSWR(<RideTracker rideId="r1" onBookAnother={() => {}} />);
+
+    expect(await screen.findByRole("heading", { name: "Your driver is on the way" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "I'm coming" })).not.toBeInTheDocument();
   });
 
   it("hides the cancel button when the ride can no longer be cancelled", async () => {
