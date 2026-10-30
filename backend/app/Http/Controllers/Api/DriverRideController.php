@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\UpdateDriverLocationRequest;
 use App\Http\Requests\UpdateDriverStatusRequest;
 use App\Http\Resources\DriverResource;
 use App\Http\Resources\RideResource;
@@ -74,6 +75,17 @@ class DriverRideController extends Controller
     public function updateStatus(UpdateDriverStatusRequest $request): JsonResponse
     {
         $driver = $this->availability->setStatus($this->driver($request), $request->status());
+
+        return ApiResponse::success(new DriverResource($driver->load('user')));
+    }
+
+    public function updateLocation(UpdateDriverLocationRequest $request): JsonResponse
+    {
+        $driver = $this->availability->moveTo(
+            $this->driver($request),
+            (float) $request->validated('lat'),
+            (float) $request->validated('lng'),
+        );
 
         return ApiResponse::success(new DriverResource($driver->load('user')));
     }

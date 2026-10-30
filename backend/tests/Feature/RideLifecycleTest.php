@@ -397,3 +397,38 @@ describe('driver availability', function () {
             ->assertUnprocessable();
     });
 });
+
+describe('driver location', function () {
+    it('shows a request once the driver moves near it', function () {
+        $driver = driverAt('Emporium Mall');
+
+        $this->actingAs($driver->user, 'sanctum')
+            ->getJson('/api/driver/rides/available')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        $libertyMarket = place('Liberty Market');
+        $this->actingAs($driver->user, 'sanctum')
+            ->patchJson('/api/driver/location', ['lat' => $libertyMarket['lat'], 'lng' => $libertyMarket['lng']])
+            ->assertOk()
+            ->assertJsonPath('data.location.lat', $libertyMarket['lat']);
+
+        $this->actingAs($driver->user, 'sanctum')
+            ->getJson('/api/driver/rides/available')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $this->ride->id);
+    });
+
+    it('rejects a location that is not on the map', function () {
+        $this->actingAs($this->driver->user, 'sanctum')
+            ->patchJson('/api/driver/location', ['lat' => 200])
+            ->assertUnprocessable()
+            ->assertJsonStructure(['error' => ['details' => ['lat', 'lng']]]);
+    });
+
+    it('is only for drivers', function () {
+        $this->actingAs($this->rider, 'sanctum')
+            ->patchJson('/api/driver/location', ['lat' => 31.5, 'lng' => 74.3])
+            ->assertForbidden();
+    });
+});

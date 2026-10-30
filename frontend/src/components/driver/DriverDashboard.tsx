@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { AppShell } from "@/components/layout/AppShell";
+import { PlaceSelect } from "@/components/booking/PlaceSelect";
 import { CancelRideButton } from "@/components/ride/CancelRideButton";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -44,9 +45,18 @@ export function DriverDashboard() {
   const [actionError, setActionError] = useState<unknown>(null);
   const [lastTrip, setLastTrip] = useState<Ride | null>(null);
   const [changingStatus, setChangingStatus] = useState(false);
+  const [moving, setMoving] = useState(false);
+
+  // The driver picks where they are from the same places riders book from.
+  const cities = useSWR(ready ? "cities" : null, api.cities, { revalidateOnFocus: false });
+  const places = cities.data?.[0]?.places ?? [];
+  const here = places.find(
+    (p) => driver?.location && Number(p.lat) === Number(driver.location.lat) && Number(p.lng) === Number(driver.location.lng),
+  );
 
   const refreshAvailable = available.mutate;
   const refreshCurrent = current.mutate;
+  const refreshMe = me.mutate;
   const driverId = driver?.id;
   const currentRideId = currentRide?.id;
 
@@ -62,6 +72,12 @@ export function DriverDashboard() {
     return listenToRide(currentRideId, () => void refreshCurrent());
   }, [currentRideId, refreshCurrent]);
 
+  // When the trip ends (including the rider cancelling it), the server puts
+  // the driver back online, so reload the driver's status to match.
+  useEffect(() => {
+    if (!currentRideId) void refreshMe();
+  }, [currentRideId, refreshMe]);
+
   async function toggleAvailability() {
     setChangingStatus(true);
     setActionError(null);
@@ -75,12 +91,32 @@ export function DriverDashboard() {
     }
   }
 
+  /** Requests are matched to where the driver is, so moving changes which ones show up. */
+  async function moveTo(placeId: number | null) {
+    const place = places.find((p) => p.id === placeId);
+    if (!place) return;
+    setMoving(true);
+    setActionError(null);
+    try {
+      await api.setDriverLocation(place.lat, place.lng);
+      await me.mutate();
+      void available.mutate();
+    } catch (e) {
+      setActionError(e);
+    } finally {
+      setMoving(false);
+    }
+  }
+
   async function accept(ride: Ride) {
     setBusyRideId(ride.id);
     setActionError(null);
     setLastTrip(null);
     try {
       const accepted = await api.acceptRide(ride.id);
+      // Drop the accepted ride from the saved list, so it doesn't flash up
+      // again when the driver is next looking for rides.
+      void available.mutate((list) => list?.filter((r) => r.id !== ride.id), { revalidate: false });
       await current.mutate(accepted, { revalidate: false });
       void me.mutate();
     } catch (e) {
@@ -145,6 +181,18 @@ export function DriverDashboard() {
             <Button variant={online ? "secondary" : "primary"} loading={changingStatus} onClick={toggleAvailability}>
               {online ? "Go offline" : "Go online"}
             </Button>
+          )}
+          {!currentRide && places.length > 0 && (
+            <div className="w-full">
+              <PlaceSelect
+                id="driver-location"
+                label="Your location"
+                places={places}
+                value={here?.id ?? null}
+                onChange={moveTo}
+                disabled={moving}
+              />
+            </div>
           )}
         </Card>
 

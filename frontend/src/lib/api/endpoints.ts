@@ -60,4 +60,7 @@ export const api = {
 
   setDriverStatus: (status: Exclude<DriverStatus, "on_trip">) =>
     apiRequest<Driver>("/driver/status", { method: "PATCH", body: { status } }),
+
+  setDriverLocation: (lat: number, lng: number) =>
+    apiRequest<Driver>("/driver/location", { method: "PATCH", body: { lat, lng } }),
 };

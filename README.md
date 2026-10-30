@@ -62,6 +62,10 @@ a private window. Book Liberty Market → MM Alam Road (Economy), accept it on
 the driver screen, then press Arrived → On the way to destination → Completed.
 When the driver has arrived, the rider can tap "I'm coming".
 
+**Drivers only see requests within 6 km of where they are** (and in their own
+car type). If a request doesn't show up, set the driver's **Your location** on
+the driver screen to the rider's pickup place, and it appears right away.
+
 ## Tests
 
 **Backend.** These run against a separate `ride_booking_test` database, which

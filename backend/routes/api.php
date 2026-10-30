@@ -39,5 +39,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/driver/rides/available', [DriverRideController::class, 'available']);
         Route::get('/driver/rides/current', [DriverRideController::class, 'current']);
         Route::patch('/driver/status', [DriverRideController::class, 'updateStatus']);
+        Route::patch('/driver/location', [DriverRideController::class, 'updateLocation']);
     });
 });

@@ -8,7 +8,7 @@ use App\Models\Driver;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Lets a driver go online or offline.
+ * Lets a driver go online or offline and say where they are.
  */
 class DriverAvailabilityService
 {
@@ -27,5 +27,20 @@ class DriverAvailabilityService
 
             return $driver;
         });
+    }
+
+    /**
+     * Records where the driver is now. A phone app would send this from GPS;
+     * the web app lets the driver pick their spot from the list of places.
+     */
+    public function moveTo(Driver $driver, float $lat, float $lng): Driver
+    {
+        $driver->update([
+            'current_lat' => $lat,
+            'current_lng' => $lng,
+            'location_updated_at' => now(),
+        ]);
+
+        return $driver;
     }
 }
