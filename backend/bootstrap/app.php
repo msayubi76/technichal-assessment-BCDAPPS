@@ -3,6 +3,7 @@
 use App\Exceptions\ApiException;
 use App\Exceptions\ApiExceptionRenderer;
 use App\Http\Middleware\AssignRequestId;
+use App\Http\Middleware\EnsureIdempotency;
 use App\Http\Middleware\EnsureUserRole;
 use App\Http\Middleware\LogApiRequest;
 use Illuminate\Foundation\Application;
@@ -31,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => EnsureUserRole::class,
+            'idempotent' => EnsureIdempotency::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -6,6 +6,7 @@ use App\Enums\ActorType;
 use App\Enums\RideCategory;
 use App\Enums\RideStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -76,5 +77,25 @@ class Ride extends Model
     public function events(): HasMany
     {
         return $this->hasMany(RideEvent::class)->orderBy('id');
+    }
+
+    /**
+     * Rides this user is allowed to see: a rider sees their own rides,
+     * a driver sees the rides assigned to them.
+     */
+    public function scopeVisibleTo(Builder $query, User $user): void
+    {
+        if ($user->isRider()) {
+            $query->where('rider_id', $user->id);
+
+            return;
+        }
+
+        $query->where('driver_id', $user->driver?->id ?? 0);
+    }
+
+    public function scopeActive(Builder $query): void
+    {
+        $query->whereIn('status', RideStatus::activeValues());
     }
 }
