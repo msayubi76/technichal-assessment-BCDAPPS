@@ -1,0 +1,100 @@
+name: ride-booking
+
+services:
+    mysql:
+        image: mysql:8.4
+        environment:
+            MYSQL_DATABASE: ${DB_DATABASE}
+            MYSQL_USER: ${DB_USERNAME}
+            MYSQL_PASSWORD: ${DB_PASSWORD}
+            MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+        ports:
+            - "${MYSQL_HOST_PORT:-3307}:3306"
+        volumes:
+            - mysql_data:/var/lib/mysql
+            - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+        healthcheck:
+            test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+            interval: 5s
+            timeout: 5s
+            retries: 30
+
+    api:
+        build: ./backend
+        environment: &backend-env
+            CONTAINER_ROLE: api
+            AUTO_SEED: ${AUTO_SEED:-true}
+            APP_ENV: local
+            APP_URL: http://localhost:${API_HOST_PORT:-8000}
+            FRONTEND_URL: http://localhost:${WEB_HOST_PORT:-3000}
+            PHP_CLI_SERVER_WORKERS: 4
+            DB_CONNECTION: mysql
+            DB_HOST: mysql
+            DB_PORT: 3306
+            DB_DATABASE: ${DB_DATABASE}
+            DB_USERNAME: ${DB_USERNAME}
+            DB_PASSWORD: ${DB_PASSWORD}
+            BROADCAST_CONNECTION: reverb
+            REVERB_APP_ID: ${REVERB_APP_ID}
+            REVERB_APP_KEY: ${REVERB_APP_KEY}
+            REVERB_APP_SECRET: ${REVERB_APP_SECRET}
+            REVERB_HOST: reverb
+            REVERB_PORT: 8080
+            REVERB_SCHEME: http
+        ports:
+            - "${API_HOST_PORT:-8000}:8000"
+        volumes:
+            - ./backend:/var/www/html
+            - backend_vendor:/var/www/html/vendor
+        depends_on:
+            mysql:
+                condition: service_healthy
+        healthcheck:
+            test: ["CMD-SHELL", "php -r \"\\$$h = @get_headers('http://127.0.0.1:8000/api/health'); exit(\\$$h && str_contains(\\$$h[0], ' 200') ? 0 : 1);\""]
+            interval: 5s
+            timeout: 5s
+            retries: 60
+            start_period: 20s
+
+    reverb:
+        build: ./backend
+        command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
+        environment:
+            <<: *backend-env
+            CONTAINER_ROLE: reverb
+            AUTO_SEED: "false"
+        ports:
+            - "${REVERB_HOST_PORT:-8080}:8080"
+        volumes:
+            - ./backend:/var/www/html
+            - backend_vendor:/var/www/html/vendor
+        depends_on:
+            mysql:
+                condition: service_healthy
+
+    web:
+        image: node:22-alpine
+        working_dir: /app
+        command: sh -c "npm ci --no-audit --no-fund && npm run dev -- --hostname 0.0.0.0 --port 3000"
+        environment:
+            NEXT_PUBLIC_API_URL: http://localhost:${API_HOST_PORT:-8000}
+            NEXT_PUBLIC_REVERB_APP_KEY: ${REVERB_APP_KEY}
+            NEXT_PUBLIC_REVERB_HOST: localhost
+            NEXT_PUBLIC_REVERB_PORT: ${REVERB_HOST_PORT:-8080}
+            NEXT_PUBLIC_REVERB_SCHEME: http
+            WATCHPACK_POLLING: "true"
+        ports:
+            - "${WEB_HOST_PORT:-3000}:3000"
+        volumes:
+            - ./frontend:/app
+            - frontend_node_modules:/app/node_modules
+            - frontend_next:/app/.next
+        depends_on:
+            api:
+                condition: service_healthy
+
+volumes:
+    mysql_data:
+    backend_vendor:
+    frontend_node_modules:
+    frontend_next:
