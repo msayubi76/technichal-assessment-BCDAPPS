@@ -1,7 +1,7 @@
 # Architecture
 
 This page explains how the app is built, then answers the 8 architecture
-questions. Each answer starts with a one-line summary.
+questions.
 
 **Contents:** [How it fits together](#how-it-fits-together) ·
 [Database tables](#database-tables) ·
@@ -109,8 +109,8 @@ stateDiagram-v2
 
 ### 1. Why this stack and architecture?
 
-**Short answer:** tools I know well, which handle the hard parts out of the
-box, in one well-organised API.
+**Tools I know well, which handle the hard parts out of the
+box, in one well-organised API.**
 
 | Choice | Why |
 |---|---|
@@ -122,8 +122,8 @@ box, in one well-organised API.
 
 ### 2. How do you stop two drivers accepting the same ride?
 
-**Short answer:** a database lock lets only one driver through, and unique
-indexes block anything that slips past it.
+**A database lock lets only one driver through, and unique
+indexes block anything that slips past it.**
 
 1. **Lock.** When a driver accepts, `RideService::accept` locks the ride row,
    then the driver row, always in that order (so two requests can't block each
@@ -151,9 +151,9 @@ As a check, I removed the lock: the test failed.
 
 ### 3. How do you handle retries and duplicate requests?
 
-**Short answer:** every action that changes a ride carries an
+**Every action that changes a ride carries an
 `Idempotency-Key`. Sending the same key again returns the first answer instead
-of doing the action twice.
+of doing the action twice.**
 
 | What happens | Reply |
 |---|---|
@@ -172,8 +172,8 @@ of doing the action twice.
 
 ### 4. What does the frontend do when a request fails?
 
-**Short answer:** it retries only when that is safe, and otherwise shows a
-clear message with a "Try again" button. The screen never goes blank.
+**It retries only when that is safe, and otherwise shows a
+clear message with a "Try again" button. The screen never goes blank.**
 
 - **One error type.** Every failure becomes an `ApiError` with a status, code,
   message and request id. No connection becomes `network_error`; no reply
@@ -198,8 +198,8 @@ clear message with a "Try again" button. The screen never goes blank.
 
 ### 5. How would it scale to many cities and thousands of users?
 
-**Short answer:** cities are already built in. For more users, run more API
-copies, and move driver locations to Redis.
+**Cities are already built in. For more users, run more API
+copies, and move driver locations to Redis.**
 
 **More cities (already supported).** Each city has its own service area,
 currency and prices. Rides and drivers belong to a city, and matching looks in
@@ -220,8 +220,8 @@ exact city borders (polygons), time zones per city, and surge pricing per area
 
 ### 6. When would you add Redis, a message broker, or separate services?
 
-**Short answer:** Redis first, a queue when side effects grow, separate
-services only when a part really needs it.
+**Redis first, a queue when side effects grow, separate
+services only when a part really needs it.**
 
 - **Redis: first.** As soon as there is more than one API copy or live GPS.
   It gives shared rate limits and cache, driver locations (GEO), scaling for
@@ -242,8 +242,8 @@ services only when a part really needs it.
 
 ### 7. How would you deploy, monitor and roll back?
 
-**Short answer:** tested, versioned Docker images; logs, errors and alerts in
-one place; roll back by redeploying the previous image.
+**Tested, versioned Docker images; logs, errors and alerts in
+one place; roll back by redeploying the previous image.**
 
 **Deploy:**
 - **CI** runs every backend test (including the concurrency tests on real
