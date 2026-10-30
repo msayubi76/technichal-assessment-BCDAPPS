@@ -27,7 +27,7 @@ desktop app. I used it as a pair programmer for the whole project.
 
 AI output was treated as untrusted until it passed checks:
 
-- **Automated tests:** 98 backend tests (unit, feature, and concurrency tests
+- **Automated tests:** 101 backend tests (unit, feature, and concurrency tests
   that fork real processes against MySQL), 15 frontend unit tests, and one
   Playwright end-to-end test of the full rider and driver journey (accept,
   arrived, "I'm coming", on the way, completed).

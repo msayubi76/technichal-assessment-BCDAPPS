@@ -170,6 +170,11 @@ cd frontend && npx playwright install chromium && npx playwright test
 To use an installed Chrome instead of downloading Playwright's browser, set
 `PW_BROWSER_CHANNEL=chrome` before `npx playwright test`.
 
+> **Known issue:** right after the app starts, this test can fail at the
+> driver's sign-in (seen with Docker on Windows). Open http://localhost:3000
+> once, wait a minute, and run it again. See
+> [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
+
 ---
 
 ## API

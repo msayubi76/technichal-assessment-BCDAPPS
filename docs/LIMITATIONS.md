@@ -30,6 +30,7 @@ fix.
 | Logs are local JSON files; there are no metrics, tracing or alerting. | Central logs, Sentry, metrics (latency, 5xx, match rate, time to accept) and alerts. |
 | The sample CI workflow has not been run on GitHub. | Run it on the real repository and add image builds and deploy steps. |
 | The end-to-end test runs against the dev stack and shared demo data. It cleans up after itself, but isn't isolated. | A dedicated e2e database that's reset before each run. |
+| The end-to-end test can fail at the driver's sign-in, in its second browser window, when the dev server in Docker has just started (seen on Windows). Signing in by hand works, and the full flow was also checked by hand. | Run the e2e test against a production build (`next build` + `next start`) instead of the dev server, and retry it once in CI. |
 
 ## Security
 
